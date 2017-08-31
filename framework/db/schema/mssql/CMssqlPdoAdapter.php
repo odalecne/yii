@@ -69,4 +69,23 @@ class CMssqlPdoAdapter extends PDO
 		$this->exec('ROLLBACK TRANSACTION');
 		return true;
 	}
+
+	/**
+	 * Retrieve a database connection attribute.
+	 * It is necessary to override PDO's method as some MSSQL PDO driver (e.g. dblib) does not
+	 * support getting attributes
+	 */
+	public function getAttribute($attribute)
+	{
+		try {
+			return parent::getAttribute($attribute);
+		} catch (\PDOException $e) {
+			switch ($attribute) {
+				case PDO::ATTR_SERVER_VERSION:
+					return $this->query("SELECT SERVERPROPERTY('productversion')")->fetchColumn();
+				default:
+					throw $e;
+			}
+		}
+	}
 }

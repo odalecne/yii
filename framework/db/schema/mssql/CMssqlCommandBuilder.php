@@ -195,10 +195,27 @@ class CMssqlCommandBuilder extends CDbCommandBuilder
 	{
 		$limit = $limit!==null ? (int)$limit : -1;
 		$offset = $offset!==null ? (int)$offset : -1;
-		if ($limit > 0 && $offset <= 0) //just limit
-			$sql = preg_replace('/^([\s(])*SELECT( DISTINCT)?(?!\s*TOP\s*\()/i',"\\1SELECT\\2 TOP $limit", $sql);
-		elseif($limit > 0 && $offset > 0)
-			$sql = $this->rewriteLimitOffsetSql($sql, $limit,$offset);
+		static $version = null;
+		if(is_null($version))
+			$version = (int)array_shift(explode('.', $this->getDbConnection()->getServerVersion())); //major version
+		if($version < 10) //SQL Server < 2008
+		{
+			if($limit > 0 && $offset <= 0) //just limit
+				$sql = preg_replace('/^([\s(])*SELECT( DISTINCT)?(?!\s*TOP\s*\()/i',"\\1SELECT\\2 TOP $limit", $sql);
+			elseif($limit > 0 && $offset > 0)
+				$sql = $this->rewriteLimitOffsetSql($sql, $limit,$offset);
+		}
+		else
+		{
+			if($offset >= 0)
+			{
+				if(!preg_match('/ORDER BY/i', $sql))
+					$sql .= ' ORDER BY 1'; //ORDER BY is required by OFFSET-FETCH clause
+				$sql .= ' OFFSET '.(int)$offset.' ROWS';
+				if($limit >= 0)
+					$sql .= ' FETCH NEXT '.(int)$limit.' ROWS ONLY';
+			}
+		}
 		return $sql;
 	}
 
